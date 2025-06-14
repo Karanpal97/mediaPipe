@@ -1,63 +1,95 @@
-<!-- Save this as mediapipe.html -->
-<html>
-  <head>
-    <title>MediaPipe Hand Detection</title>
-    <style>
-      body { margin: 0; overflow: hidden; }
-      canvas { position: absolute; }
-      video { display: none; }
-    </style>
-  </head>
-  <body>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    <script type="module">
-      import { Hands } from 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js';
-      import { drawConnectors, drawLandmarks } from 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js';
-      import { Camera } from 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MediaPipe Hand Detection</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 0;
+    }
+    canvas {
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
 
-      const videoElement = document.getElementById('video');
-      const canvasElement = document.getElementById('canvas');
-      const canvasCtx = canvasElement.getContext('2d');
+  <!-- MediaPipe Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
-      function resizeCanvas() {
-        canvasElement.width = window.innerWidth;
-        canvasElement.height = window.innerHeight;
+  <!-- Import draw functions -->
+  <script>
+    const { drawConnectors, drawLandmarks, HAND_CONNECTIONS } = window;
+  </script>
+
+  <script>
+    const videoElement = document.getElementById('video');
+    const canvasElement = document.getElementById('canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    function resizeCanvas() {
+      if (videoElement.videoWidth && videoElement.videoHeight) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+      }
+    }
+
+    const hands = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
+      }
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+      selfieMode: false // try true if you want mirrored hand
+    });
+
+    hands.onResults((results) => {
+      resizeCanvas();
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.multiHandLandmarks) {
+        for (const landmarks of results.multiHandLandmarks) {
+          drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+          drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
+        }
       }
 
-      window.addEventListener('resize', resizeCanvas);
-      resizeCanvas();
+      canvasCtx.restore();
+    });
 
-      const hands = new Hands({
-        locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-      });
-
-      hands.setOptions({
-        maxNumHands: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.7,
-      });
-
-      hands.onResults(results => {
-        canvasCtx.save();
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        if (results.multiHandLandmarks) {
-          for (const landmarks of results.multiHandLandmarks) {
-            drawConnectors(canvasCtx, landmarks, Hands.HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-            drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
-          }
-        }
-        canvasCtx.restore();
-      });
-
-      const camera = new Camera(videoElement, {
-        onFrame: async () => {
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        if (videoElement.readyState >= 2) {
           await hands.send({ image: videoElement });
-        },
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-      camera.start();
-    </script>
-  </body>
+        }
+      },
+      width: 1280,
+      height: 720
+    });
+
+    camera.start();
+  </script>
+</body>
 </html>
